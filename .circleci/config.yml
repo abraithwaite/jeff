@@ -1,0 +1,22 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: golang:1.10
+      - image: redis
+      - image: memcached
+
+    working_directory: /go/src/github.com/abraithwaite/jeff
+
+    steps:
+      - checkout
+
+      - run:
+          name: Install dep
+          command: |
+            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+            make deps
+
+      - run:
+          name: Run tests
+          command: make test
