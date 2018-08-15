@@ -20,11 +20,11 @@ details.
 ## Features
 
 - Redirect to login
-- Middleware Wrapper
-- Easy to Clear Sessions
+- Middleware wrapper
+- Easy to clear sessions
+- Small, idiomatic API
+- Context aware
 - Fast
-- Small, Idiomatic API
-- Context Aware
 
 ## Usage
 
@@ -83,6 +83,24 @@ unauthenticated, rendering the page normally but without user info.
     // customHandler gets called when authentication fails
     sessions := jeff.New(store, jeff.Redirect(customHandler))
 ```
+
+## Design
+
+Session tokens are securely generated on `Set` (called after successful login).
+This library is unique in that the user gets to decide the session key. This is
+to make it easier for operators to manage sessions by not having to track/store
+session tokens after creating a session. Session keys don't have to be
+cryptographically secure, just unique per login.  A good key that works for
+most people is the user's email.  If you want to allow multiple logins from
+different user-agents simultaneously, then you might want to include some kind
+of device ID in the key.
+
+The cookie format is as follows:
+
+    CookieName=SessionKey::SessionToken
+
+The SessionKey is used to find the given session in the backend. If found, the
+client SessionToken is then constant-time compared with the stored token.
 
 ## Security
 
