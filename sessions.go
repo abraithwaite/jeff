@@ -41,8 +41,18 @@ type Jeff struct {
 // Storage provides the base level abstraction for implementing session
 // storage.  Typically this would be memcache, redis or a database.
 type Storage interface {
+	// Store persists the session in the backend with the given expiration
+	// Implementation must return value exactly as it is received.
+	// Value will be given as...
 	Store(ctx context.Context, key, value []byte, exp time.Time) error
-	Fetch(ctx context.Context, key []byte) ([]byte, error)
+	// Fetch retrieves the session from the backend.  If err != nil or
+	// value == nil, then it's assumed that the session is invalid and Jeff
+	// will redirect.  Expired sessions must return nil error and nil value.
+	// Unknown (not found) sessions must return nil error and nil value.
+	Fetch(ctx context.Context, key []byte) (value []byte, err error)
+	// Delete removes the session given by key from the store. Errors are
+	// bubbled up to the caller.  Delete should not return an error on expired
+	// or missing keys.
 	Delete(ctx context.Context, key []byte) error
 }
 

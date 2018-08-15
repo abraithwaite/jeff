@@ -17,6 +17,15 @@ This library is requires a stateful backend to enable easy session revocation
 and simplify the security considerations.  See the section on security for more
 details.
 
+## Features
+
+- Redirect to login
+- Middleware Wrapper
+- Easy to Clear Sessions
+- Fast
+- Small, Idiomatic API
+- Context Aware
+
 ## Usage
 
 There are three primary methods:
@@ -50,7 +59,7 @@ Clear deletes the active session from the store for the given key.
 
 ```go
 func (s Server) Revoke(w http.ResponseWriter, r *http.Request) {
-    // stuff to get user
+    // stuff to get user: admin input form or perhaps even from current session
     err = s.jeff.Clear(r.Context(), user.Email)
     // handle err
 }
@@ -107,8 +116,27 @@ For either of these features, please see one of the libraries below.
 
 ## Alternatives
 
-https://github.com/kataras/go-sessions
+The most popular session management tool is in the gorilla toolkit. It uses
+encrypted cookies by default.  Has a very large API.
 
 https://github.com/gorilla/sessions
 
+A comprehensive session management tool.  Also a very large API.  Heavy use of
+naked interfaces.
+
+https://github.com/kataras/go-sessions
+
+Encrypted cookie manager by default.  Has middleware feature.  Big API. No easy
+way to clear session without storing session token elsewhere.
+
 https://github.com/alexedwards/scs
+
+Lightweight, server-only API.  Uncertain about what the purpose of the Manager
+interface is.  Heavy use of naked interface.
+
+https://github.com/icza/session
+
+Lightweight, server-only API.  Includes concept of Users in library. No
+wrapping or middleware.
+
+https://github.com/rivo/sessions
