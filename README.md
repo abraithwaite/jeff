@@ -132,6 +132,9 @@ concern for this library.
 
 For either of these features, please see one of the libraries below.
 
+Multiple sessions currently require users to designate multiple unique session
+keys per-user.  e.g. `<email>+<deviceid>`
+
 ## Alternatives
 
 The most popular session management tool is in the gorilla toolkit. It uses

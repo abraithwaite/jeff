@@ -192,7 +192,6 @@ func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte) error
 		exp = now().Add(30 * 24 * time.Hour)
 	}
 	http.SetCookie(w, c)
-	// TODO: encode key as store key?
 	return j.s.Store(ctx, key, []byte(secure), exp)
 }
 

@@ -22,7 +22,7 @@ type server struct {
 	t *testing.T
 }
 
-var email = []byte("super@example.com")
+var email = []byte("super@exa::mple.com")
 
 func (s *server) login(w http.ResponseWriter, r *http.Request) {
 	err := s.j.Set(r.Context(), w, email)
