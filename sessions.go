@@ -11,8 +11,9 @@ import (
 	"time"
 )
 
-// Cookie Format:
-// CookieName=SessionKey::SessionToken
+// Cookie Format
+// SessionToken is already encoded and safe
+// CookieName=encode(SessionKey)::SessionToken
 const separator = "::"
 
 var defaultRedirect = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -192,6 +193,9 @@ func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte) error
 		exp = now().Add(30 * 24 * time.Hour)
 	}
 	http.SetCookie(w, c)
+	// Prevent CSRF.  SameSite attribute added in Go1.11
+	// https://golang.org/cl/79919
+	w.Header().Set("Set-Cookie", w.Header().Get("Set-Cookie")+"; SameSite=lax")
 	return j.s.Store(ctx, key, []byte(secure), exp)
 }
 

@@ -23,6 +23,7 @@ details.
 - Middleware wrapper
 - Easy to clear sessions
 - Small, idiomatic API
+- CSRF Protection
 - Context aware
 - Fast
 
@@ -122,6 +123,14 @@ cookie.  Programs like [chamber](https://github.com/segmentio/chamber) can aid
 in handling these secrets, but any developer can tell you that accidentally
 logging environment variables is commonplace.  I'd rather reduce the secrets
 required for my service to a minimum.
+
+### CSRF Protection
+
+This library also provides limited CSRF protection via the SameSite session
+cookie attribute.  This attribute (implemented in modern browsers) limits a
+Cross Origin Request to a subset of safe HTTP methods.  See the [OWASP
+Guide](https://www.owasp.org/index.php/SameSite) for more details.
+
 
 ## Limitations
 
