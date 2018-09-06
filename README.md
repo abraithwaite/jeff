@@ -3,7 +3,7 @@
 [![Build](https://circleci.com/gh/abraithwaite/jeff.svg?style=shield)](https://circleci.com/gh/abraithwaite/jeff)
 [![GoDoc](https://godoc.org/github.com/abraithwaite/jeff?status.svg)](https://godoc.org/github.com/abraithwaite/jeff)
 [![Go Report Card](https://goreportcard.com/badge/github.com/abraithwaite/jeff)](https://goreportcard.com/report/github.com/abraithwaite/jeff)
-[![License](https://img.shields.io/badge/license-Apache--2.0-5B74AD.svg)](https://github.com/abraithwaite/jeff/blob/master/LICENSE)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-5B74AD.svg)](https://github.com/abraithwaite/jeff/blob/master/LICENSE)
 
 
 A tool for managing login sessions in Go.
