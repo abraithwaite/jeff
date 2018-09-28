@@ -70,19 +70,15 @@ func prune(l SessionList) SessionList {
 	return ret
 }
 
-func (j *Jeff) store(ctx context.Context, key, val []byte, exp time.Time) error {
-	sl, err := j.load(ctx, key)
+func (j *Jeff) store(ctx context.Context, s Session) error {
+	sl, err := j.load(ctx, s.Key)
 	if err != nil {
 		return err
 	}
-	if _, i := find(sl, val); i >= 0 {
-		// NOTE: I'm not sure when this would run.  Defensive update on exp
-		sl[i].Exp = exp
+	if _, i := find(sl, s.Token); i >= 0 {
+		sl[i] = s
 	} else {
-		sl = append(sl, Session{
-			Token: val,
-			Exp:   exp,
-		})
+		sl = append(sl, s)
 	}
 	sl = prune(sl)
 	bts, err := sl.MarshalMsg(nil)
@@ -90,7 +86,7 @@ func (j *Jeff) store(ctx context.Context, key, val []byte, exp time.Time) error 
 		return err
 	}
 	// Global Expiration 30d, TODO: make configurable
-	return j.s.Store(ctx, key, bts, now().Add(24*30*time.Hour))
+	return j.s.Store(ctx, s.Key, bts, now().Add(24*30*time.Hour))
 }
 
 func (j *Jeff) clear(ctx context.Context, key []byte) error {

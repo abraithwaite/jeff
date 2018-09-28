@@ -134,19 +134,23 @@ func (j *Jeff) Wrap(wrap http.Handler) http.Handler {
 			return
 		}
 		ctx := r.Context()
-		_, err = j.loadOne(ctx, decoded, []byte(vals[1]))
+		s, err := j.loadOne(ctx, decoded, []byte(vals[1]))
 		if err != nil {
 			j.redir.ServeHTTP(w, r)
 		} else {
-			r = r.WithContext(context.WithValue(ctx, sessionKey, decoded))
+			r = r.WithContext(context.WithValue(ctx, sessionKey, s))
 			wrap.ServeHTTP(w, r)
 		}
 	})
 }
 
 // Set the session cookie on the response.  Call after successful
-// authentication / login.
-func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte) error {
+// authentication / login.  meta optional parameter sets metadata in the
+// session storage.
+func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte, meta ...[]byte) error {
+	if len(meta) > 1 {
+		panic("meta must not be longer than 1")
+	}
 	secure, err := genRandomString(24) // 192 bits
 	if err != nil {
 		// Critical System error
@@ -172,7 +176,16 @@ func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte) error
 	// Prevent CSRF.  SameSite attribute added in Go1.11
 	// https://golang.org/cl/79919
 	w.Header().Set("Set-Cookie", w.Header().Get("Set-Cookie")+"; SameSite=lax")
-	return j.store(ctx, key, []byte(secure), exp)
+	var m []byte
+	if len(meta) == 1 {
+		m = meta[0]
+	}
+	return j.store(ctx, Session{
+		Key:   key,
+		Token: []byte(secure),
+		Exp:   exp,
+		Meta:  m,
+	})
 }
 
 // Clear the session for the given key.
@@ -180,11 +193,11 @@ func (j *Jeff) Clear(ctx context.Context, key []byte) error {
 	return j.clear(ctx, key)
 }
 
-func ActiveSession(ctx context.Context) []byte {
-	if v, ok := ctx.Value(sessionKey).([]byte); ok {
+func ActiveSession(ctx context.Context) Session {
+	if v, ok := ctx.Value(sessionKey).(Session); ok {
 		return v
 	}
-	return nil
+	return Session{}
 }
 
 func (j *Jeff) defaults() {

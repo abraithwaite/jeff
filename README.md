@@ -26,6 +26,7 @@ details.
 - CSRF Protection
 - Context aware
 - Fast
+- Multiple sessions under one key
 
 ## Usage
 

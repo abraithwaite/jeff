@@ -25,7 +25,7 @@ type server struct {
 var email = []byte("super@exa::mple.com")
 
 func (s *server) login(w http.ResponseWriter, r *http.Request) {
-	err := s.j.Set(r.Context(), w, email)
+	err := s.j.Set(r.Context(), w, email, []byte(r.UserAgent()))
 	assert.NoError(s.t, err)
 }
 
@@ -35,7 +35,7 @@ var redir = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) authed(w http.ResponseWriter, r *http.Request) {
 	v := jeff.ActiveSession(r.Context())
-	assert.Equal(s.t, email, v, "authed session should set the user on context")
+	assert.Equal(s.t, email, v.Key, "authed session should set the user on context")
 }
 
 func TestMemory(t *testing.T) {
@@ -118,6 +118,7 @@ func Suite(t *testing.T, store jeff.Storage) {
 
 	t.Run("login", func(t *testing.T) {
 		req = httptest.NewRequest("GET", "http://example.com/login", nil)
+		req.Header.Set("User-Agent", "golang-user-agent")
 		w = httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 		resp := w.Result()

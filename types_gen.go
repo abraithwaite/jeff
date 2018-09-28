@@ -22,13 +22,23 @@ func (z *Session) DecodeMsg(dc *msgp.Reader) (err error) {
 			return
 		}
 		switch msgp.UnsafeString(field) {
-		case "exp":
-			z.Exp, err = dc.ReadTime()
+		case "key":
+			z.Key, err = dc.ReadBytes(z.Key)
 			if err != nil {
 				return
 			}
 		case "token":
 			z.Token, err = dc.ReadBytes(z.Token)
+			if err != nil {
+				return
+			}
+		case "meta":
+			z.Meta, err = dc.ReadBytes(z.Meta)
+			if err != nil {
+				return
+			}
+		case "exp":
+			z.Exp, err = dc.ReadTime()
 			if err != nil {
 				return
 			}
@@ -44,13 +54,13 @@ func (z *Session) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *Session) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 2
-	// write "exp"
-	err = en.Append(0x82, 0xa3, 0x65, 0x78, 0x70)
+	// map header, size 4
+	// write "key"
+	err = en.Append(0x84, 0xa3, 0x6b, 0x65, 0x79)
 	if err != nil {
 		return
 	}
-	err = en.WriteTime(z.Exp)
+	err = en.WriteBytes(z.Key)
 	if err != nil {
 		return
 	}
@@ -63,19 +73,43 @@ func (z *Session) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
+	// write "meta"
+	err = en.Append(0xa4, 0x6d, 0x65, 0x74, 0x61)
+	if err != nil {
+		return
+	}
+	err = en.WriteBytes(z.Meta)
+	if err != nil {
+		return
+	}
+	// write "exp"
+	err = en.Append(0xa3, 0x65, 0x78, 0x70)
+	if err != nil {
+		return
+	}
+	err = en.WriteTime(z.Exp)
+	if err != nil {
+		return
+	}
 	return
 }
 
 // MarshalMsg implements msgp.Marshaler
 func (z *Session) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 2
-	// string "exp"
-	o = append(o, 0x82, 0xa3, 0x65, 0x78, 0x70)
-	o = msgp.AppendTime(o, z.Exp)
+	// map header, size 4
+	// string "key"
+	o = append(o, 0x84, 0xa3, 0x6b, 0x65, 0x79)
+	o = msgp.AppendBytes(o, z.Key)
 	// string "token"
 	o = append(o, 0xa5, 0x74, 0x6f, 0x6b, 0x65, 0x6e)
 	o = msgp.AppendBytes(o, z.Token)
+	// string "meta"
+	o = append(o, 0xa4, 0x6d, 0x65, 0x74, 0x61)
+	o = msgp.AppendBytes(o, z.Meta)
+	// string "exp"
+	o = append(o, 0xa3, 0x65, 0x78, 0x70)
+	o = msgp.AppendTime(o, z.Exp)
 	return
 }
 
@@ -95,13 +129,23 @@ func (z *Session) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			return
 		}
 		switch msgp.UnsafeString(field) {
-		case "exp":
-			z.Exp, bts, err = msgp.ReadTimeBytes(bts)
+		case "key":
+			z.Key, bts, err = msgp.ReadBytesBytes(bts, z.Key)
 			if err != nil {
 				return
 			}
 		case "token":
 			z.Token, bts, err = msgp.ReadBytesBytes(bts, z.Token)
+			if err != nil {
+				return
+			}
+		case "meta":
+			z.Meta, bts, err = msgp.ReadBytesBytes(bts, z.Meta)
+			if err != nil {
+				return
+			}
+		case "exp":
+			z.Exp, bts, err = msgp.ReadTimeBytes(bts)
 			if err != nil {
 				return
 			}
@@ -118,7 +162,7 @@ func (z *Session) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *Session) Msgsize() (s int) {
-	s = 1 + 4 + msgp.TimeSize + 6 + msgp.BytesPrefixSize + len(z.Token)
+	s = 1 + 4 + msgp.BytesPrefixSize + len(z.Key) + 6 + msgp.BytesPrefixSize + len(z.Token) + 5 + msgp.BytesPrefixSize + len(z.Meta) + 4 + msgp.TimeSize
 	return
 }
 
@@ -135,36 +179,9 @@ func (z *SessionList) DecodeMsg(dc *msgp.Reader) (err error) {
 		(*z) = make(SessionList, zb0002)
 	}
 	for zb0001 := range *z {
-		var field []byte
-		_ = field
-		var zb0003 uint32
-		zb0003, err = dc.ReadMapHeader()
+		err = (*z)[zb0001].DecodeMsg(dc)
 		if err != nil {
 			return
-		}
-		for zb0003 > 0 {
-			zb0003--
-			field, err = dc.ReadMapKeyPtr()
-			if err != nil {
-				return
-			}
-			switch msgp.UnsafeString(field) {
-			case "exp":
-				(*z)[zb0001].Exp, err = dc.ReadTime()
-				if err != nil {
-					return
-				}
-			case "token":
-				(*z)[zb0001].Token, err = dc.ReadBytes((*z)[zb0001].Token)
-				if err != nil {
-					return
-				}
-			default:
-				err = dc.Skip()
-				if err != nil {
-					return
-				}
-			}
 		}
 	}
 	return
@@ -176,23 +193,8 @@ func (z SessionList) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	for zb0004 := range z {
-		// map header, size 2
-		// write "exp"
-		err = en.Append(0x82, 0xa3, 0x65, 0x78, 0x70)
-		if err != nil {
-			return
-		}
-		err = en.WriteTime(z[zb0004].Exp)
-		if err != nil {
-			return
-		}
-		// write "token"
-		err = en.Append(0xa5, 0x74, 0x6f, 0x6b, 0x65, 0x6e)
-		if err != nil {
-			return
-		}
-		err = en.WriteBytes(z[zb0004].Token)
+	for zb0003 := range z {
+		err = z[zb0003].EncodeMsg(en)
 		if err != nil {
 			return
 		}
@@ -204,14 +206,11 @@ func (z SessionList) EncodeMsg(en *msgp.Writer) (err error) {
 func (z SessionList) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
 	o = msgp.AppendArrayHeader(o, uint32(len(z)))
-	for zb0004 := range z {
-		// map header, size 2
-		// string "exp"
-		o = append(o, 0x82, 0xa3, 0x65, 0x78, 0x70)
-		o = msgp.AppendTime(o, z[zb0004].Exp)
-		// string "token"
-		o = append(o, 0xa5, 0x74, 0x6f, 0x6b, 0x65, 0x6e)
-		o = msgp.AppendBytes(o, z[zb0004].Token)
+	for zb0003 := range z {
+		o, err = z[zb0003].MarshalMsg(o)
+		if err != nil {
+			return
+		}
 	}
 	return
 }
@@ -229,36 +228,9 @@ func (z *SessionList) UnmarshalMsg(bts []byte) (o []byte, err error) {
 		(*z) = make(SessionList, zb0002)
 	}
 	for zb0001 := range *z {
-		var field []byte
-		_ = field
-		var zb0003 uint32
-		zb0003, bts, err = msgp.ReadMapHeaderBytes(bts)
+		bts, err = (*z)[zb0001].UnmarshalMsg(bts)
 		if err != nil {
 			return
-		}
-		for zb0003 > 0 {
-			zb0003--
-			field, bts, err = msgp.ReadMapKeyZC(bts)
-			if err != nil {
-				return
-			}
-			switch msgp.UnsafeString(field) {
-			case "exp":
-				(*z)[zb0001].Exp, bts, err = msgp.ReadTimeBytes(bts)
-				if err != nil {
-					return
-				}
-			case "token":
-				(*z)[zb0001].Token, bts, err = msgp.ReadBytesBytes(bts, (*z)[zb0001].Token)
-				if err != nil {
-					return
-				}
-			default:
-				bts, err = msgp.Skip(bts)
-				if err != nil {
-					return
-				}
-			}
 		}
 	}
 	o = bts
@@ -268,8 +240,8 @@ func (z *SessionList) UnmarshalMsg(bts []byte) (o []byte, err error) {
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z SessionList) Msgsize() (s int) {
 	s = msgp.ArrayHeaderSize
-	for zb0004 := range z {
-		s += 1 + 4 + msgp.TimeSize + 6 + msgp.BytesPrefixSize + len(z[zb0004].Token)
+	for zb0003 := range z {
+		s += z[zb0003].Msgsize()
 	}
 	return
 }
