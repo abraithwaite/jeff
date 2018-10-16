@@ -2,7 +2,6 @@ package memory
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 )
@@ -42,7 +41,7 @@ func (m *Memory) Fetch(_ context.Context, key []byte) ([]byte, error) {
 	v, ok := m.sessions[string(key)]
 	m.rw.RUnlock()
 	if !ok || v.exp.Before(time.Now()) {
-		return nil, errors.New("not found")
+		return nil, nil
 	}
 	return v.value, nil
 }

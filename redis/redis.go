@@ -41,7 +41,7 @@ func (s *Store) Fetch(ctx context.Context, key []byte) ([]byte, error) {
 		return nil, err
 	}
 	bs, err := redis.Bytes(conn.Do("GET", key))
-	if err != nil {
+	if err != nil && err != redis.ErrNil {
 		return nil, err
 	}
 	return bs, nil

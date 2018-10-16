@@ -27,6 +27,9 @@ func (s *Store) Store(ctx context.Context, key, value []byte, exp time.Time) err
 
 func (s *Store) Fetch(ctx context.Context, key []byte) ([]byte, error) {
 	i, err := s.mc.Get(string(key))
+	if err == memcache.ErrCacheMiss {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
