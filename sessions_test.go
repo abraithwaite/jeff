@@ -20,6 +20,8 @@ import (
 type server struct {
 	j *jeff.Jeff
 	t *testing.T
+
+	authedPub bool
 }
 
 var email = []byte("super@exa::mple.com")
@@ -36,6 +38,15 @@ var redir = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 func (s *server) authed(w http.ResponseWriter, r *http.Request) {
 	v := jeff.ActiveSession(r.Context())
 	assert.Equal(s.t, email, v.Key, "authed session should set the user on context")
+}
+
+func (s *server) public(w http.ResponseWriter, r *http.Request) {
+	v := jeff.ActiveSession(r.Context())
+	if string(v.Key) != "" {
+		s.authedPub = true
+		assert.Equal(s.t, email, v.Key, "authed session should set the user on context")
+	}
+	w.Write([]byte("okay"))
 }
 
 func TestMemory(t *testing.T) {
@@ -95,7 +106,9 @@ func Suite(t *testing.T, store jeff.Storage) {
 
 	r := http.NewServeMux()
 	endpoint := j.Wrap(http.HandlerFunc(s.authed))
+	public := j.Public(http.HandlerFunc(s.public))
 	r.Handle("/authenticated", endpoint)
+	r.Handle("/public", public)
 	r.HandleFunc("/login", s.login)
 
 	var (
@@ -182,6 +195,36 @@ func Suite(t *testing.T, store jeff.Storage) {
 		resp := w.Result()
 		assert.Equal(t, http.StatusFound, resp.StatusCode, "unauthenticated requests should redirect")
 		assert.Equal(t, "/login", resp.Header.Get("Location"), "unauthenticated requests should redirect")
+	})
+
+	t.Run("not authenticated public", func(t *testing.T) {
+		req = httptest.NewRequest("GET", "http://example.com/public", nil)
+		w = httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		resp := w.Result()
+		assert.Equal(t, http.StatusOK, resp.StatusCode, "unauthenticated requests should not redirect")
+	})
+
+	t.Run("login", func(t *testing.T) {
+		req = httptest.NewRequest("GET", "http://example.com/login", nil)
+		req.Header.Set("User-Agent", "golang-user-agent")
+		w = httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		resp := w.Result()
+		assert.Equal(t, http.StatusOK, resp.StatusCode, "login should succeed")
+		cookies := resp.Cookies()
+		require.Equal(t, 1, len(cookies), "login should set cookie")
+		cookie = cookies[0]
+	})
+
+	t.Run("authenticated public", func(t *testing.T) {
+		req = httptest.NewRequest("GET", "http://example.com/public", nil)
+		req.AddCookie(cookie)
+		w = httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		resp := w.Result()
+		assert.Equal(t, http.StatusOK, resp.StatusCode, "authenticated should succeed")
+		assert.True(t, s.authedPub, "authenticated should set user")
 	})
 }
 
