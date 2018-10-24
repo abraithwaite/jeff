@@ -151,11 +151,7 @@ func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte, meta 
 	if len(meta) > 1 {
 		panic("meta must not be longer than 1")
 	}
-	secure, err := genRandomString(24) // 192 bits
-	if err != nil {
-		// Critical System error
-		panic(err)
-	}
+	secure := genRandomString(24) // 192 bits
 	c := &http.Cookie{
 		Secure:   !j.insecure,
 		HttpOnly: true,
@@ -218,22 +214,22 @@ func (j *Jeff) defaults() {
 // string.  It will return an error if the system's secure random number
 // generator fails to function correctly, in which case the caller should not
 // continue.
-func genRandomString(n int) (string, error) {
-	b, err := genRandomBytes(n)
-	return encode(b), err
+func genRandomString(n int) string {
+	b := genRandomBytes(n)
+	return encode(b)
 }
 
 // genRandomBytes returns securely generated random bytes.  It will return an
 // error if the system's secure random number generator fails to function
 // correctly, in which case the caller should not continue.
-func genRandomBytes(n int) ([]byte, error) {
+func genRandomBytes(n int) []byte {
 	b := make([]byte, n)
 	_, err := rand.Read(b)
 	// Note that err != nil when we fail to read len(b) bytes.
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	return b, nil
+	return b
 }
 
 func encode(b []byte) string {
