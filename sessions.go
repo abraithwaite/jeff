@@ -121,9 +121,22 @@ func (j *Jeff) Public(wrap http.Handler) http.Handler {
 	return j.wrap(wrap, wrap)
 }
 
+// PublicFunc wraps the given handler, adding the Session object (if there's an
+// active session) to the request context before passing control to the next
+// handler.
+func (j *Jeff) PublicFunc(wrap http.HandlerFunc) http.Handler {
+	return j.wrap(wrap, wrap)
+}
+
 // Wrap wraps the given handler, authenticating this route and calling the
 // redirect handler if session is invalid.
 func (j *Jeff) Wrap(wrap http.Handler) http.Handler {
+	return j.wrap(j.redir, wrap)
+}
+
+// WrapFunc wraps the given handler, authenticating this route and calling the
+// redirect handler if session is invalid.
+func (j *Jeff) WrapFunc(wrap http.HandlerFunc) http.Handler {
 	return j.wrap(j.redir, wrap)
 }
 

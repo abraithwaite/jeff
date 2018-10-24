@@ -30,7 +30,7 @@ fmtfix:
 .PHONY: test
 test:
 	$Qgo test $(GOTESTFLAGS) -coverpkg="./..." -coverprofile=.coverprofile ./...
-	$Qgrep -v types_gen < .coverprofile > .covertmp && mv .covertmp .coverprofile
+	$Qgrep -vE 'types_gen|cmd/example' < .coverprofile > .covertmp && mv .covertmp .coverprofile
 	$Qgo tool cover -func=.coverprofile
 
 .PHONY: docker
