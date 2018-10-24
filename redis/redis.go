@@ -12,12 +12,12 @@ type Store struct {
 	pool *redis.Pool
 }
 
-func New(p *redis.Pool) *Store {
-	return &Store{pool: p}
-}
-
 var now = func() time.Time {
 	return time.Now()
+}
+
+func New(p *redis.Pool) *Store {
+	return &Store{pool: p}
 }
 
 func (s *Store) Store(ctx context.Context, key, value []byte, exp time.Time) error {
@@ -27,11 +27,18 @@ func (s *Store) Store(ctx context.Context, key, value []byte, exp time.Time) err
 		return err
 	}
 	e := int(exp.Sub(now()) / time.Second)
-	_, err = conn.Do("SETEX", key, strconv.Itoa(e), value)
-	if err != nil {
+
+	done := make(chan struct{})
+	go func() {
+		_, err = conn.Do("SETEX", key, strconv.Itoa(e), value)
+		close(done)
+	}()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-done:
 		return err
 	}
-	return nil
 }
 
 func (s *Store) Fetch(ctx context.Context, key []byte) ([]byte, error) {
@@ -40,11 +47,23 @@ func (s *Store) Fetch(ctx context.Context, key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	bs, err := redis.Bytes(conn.Do("GET", key))
-	if err != nil && err != redis.ErrNil {
-		return nil, err
+
+	var bs []byte
+	done := make(chan struct{})
+	go func() {
+		bs, err = redis.Bytes(conn.Do("GET", key))
+		close(done)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-done:
+		if err != nil && err != redis.ErrNil {
+			return nil, err
+		}
+		return bs, nil
 	}
-	return bs, nil
 }
 
 func (s *Store) Delete(ctx context.Context, key []byte) error {
@@ -53,9 +72,19 @@ func (s *Store) Delete(ctx context.Context, key []byte) error {
 	if err != nil {
 		return err
 	}
-	_, err = conn.Do("DEL", key)
-	if err != nil && err != redis.ErrNil {
-		return err
+
+	done := make(chan struct{})
+	go func() {
+		_, err = conn.Do("DEL", key)
+		close(done)
+	}()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-done:
+		if err != nil && err != redis.ErrNil {
+			return err
+		}
+		return nil
 	}
-	return nil
 }

@@ -288,10 +288,3 @@ func TestSessCookie(t *testing.T) {
 	cookie := cookies[0]
 	assert.True(t, cookie.Expires.IsZero(), "cookie expiration not set (session cookie)")
 }
-
-// This doesn't work :-(
-// func SetTimes(t time.Time) {
-// 	jeff.SetTime(func() time.Time { return t })
-// 	memory.SetTime(func() time.Time { return t })
-// 	redis_store.SetTime(func() time.Time { return t })
-// }
