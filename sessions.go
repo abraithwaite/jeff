@@ -16,7 +16,7 @@ import (
 const separator = "::"
 
 var defaultRedirect = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/login", http.StatusFound)
+	http.Redirect(w, r, "/", http.StatusFound)
 })
 
 type contextKey struct{ name string }
@@ -114,29 +114,40 @@ func New(s Storage, opts ...func(*Jeff)) *Jeff {
 	return j
 }
 
+// Public wraps the given handler, adding the Session object (if there's an
+// active session) to the request context before passing control to the next
+// handler.
+func (j *Jeff) Public(wrap http.Handler) http.Handler {
+	return j.wrap(wrap, wrap)
+}
+
 // Wrap wraps the given handler, authenticating this route and calling the
 // redirect handler if session is invalid.
 func (j *Jeff) Wrap(wrap http.Handler) http.Handler {
+	return j.wrap(j.redir, wrap)
+}
+
+func (j *Jeff) wrap(redir, wrap http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie(j.cookieName)
 		if err != nil {
-			j.redir.ServeHTTP(w, r)
+			redir.ServeHTTP(w, r)
 			return
 		}
 		vals := strings.SplitN(c.Value, separator, 2)
 		if len(vals) != 2 {
-			j.redir.ServeHTTP(w, r)
+			redir.ServeHTTP(w, r)
 			return
 		}
 		decoded, err := decode(vals[0])
 		if err != nil {
-			j.redir.ServeHTTP(w, r)
+			redir.ServeHTTP(w, r)
 			return
 		}
 		ctx := r.Context()
 		s, err := j.loadOne(ctx, decoded, []byte(vals[1]))
 		if err != nil {
-			j.redir.ServeHTTP(w, r)
+			redir.ServeHTTP(w, r)
 		} else {
 			r = r.WithContext(context.WithValue(ctx, sessionKey, s))
 			wrap.ServeHTTP(w, r)
