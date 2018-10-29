@@ -49,10 +49,13 @@ func (s Server) Login(w http.ResponseWriter, r *http.Request) {
 
 Wrap authenticates every http.Handler it wraps, or redirects if authentication
 fails.  Wrap's signature works with [alice](https://github.com/justinas/alice).
+The "Public" wrapper checks for an active session but _does not_ call the
+redirect handler if there is no active session.  It's a way to set the active
+session on the request without denying access to anonymous users.
 
 ```go
     mux.HandleFunc("/login", loginHandler)
-    mux.HandleFunc("/products", j.Wrap(productHandler))
+    mux.HandleFunc("/products", j.Public(productHandler))
     mux.HandleFunc("/users", j.Wrap(usersHandler))
     http.ListenAndServe(":8080", mux)
 ```
@@ -77,9 +80,7 @@ your own login route.
         })))
 ```
 
-This is also helpful to stop a redirect on an authenticated route: For example
-if you want to display user info on the home page but not redirect if
-unauthenticated, rendering the page normally but without user info.
+This is primarily helpful to run custom logic on redirect:
 
 ```go
     // customHandler gets called when authentication fails
@@ -92,10 +93,8 @@ Session tokens are securely generated on `Set` (called after successful login).
 This library is unique in that the user gets to decide the session key. This is
 to make it easier for operators to manage sessions by not having to track/store
 session tokens after creating a session. Session keys don't have to be
-cryptographically secure, just unique per login.  A good key that works for
-most people is the user's email.  If you want to allow multiple logins from
-different user-agents simultaneously, then you might want to include some kind
-of device ID in the key.
+cryptographically secure, just unique per user.  A good key that works for
+most people is the user's email.
 
 The cookie format is as follows:
 
@@ -103,6 +102,10 @@ The cookie format is as follows:
 
 The SessionKey is used to find the given session in the backend. If found, the
 client SessionToken is then constant-time compared with the stored token.
+
+Sessions are stored in the backend as a map from the application-chosen session
+key to a list of active sessions.  Sessions are lazily cleaned up once they
+expire.
 
 ## Security
 
@@ -132,6 +135,12 @@ cookie attribute.  This attribute (implemented in modern browsers) limits a
 Cross Origin Request to a subset of safe HTTP methods.  See the [OWASP
 Guide](https://www.owasp.org/index.php/SameSite) for more details.
 
+## Development
+
+Clone the repo, run `docker-compose up -d`, then run `make test`.
+
+With the local redis instance running, you can then run the example
+application:  `go run ./cmd/example/main.go`.
 
 ## Limitations
 
@@ -141,9 +150,6 @@ Also excluded from this library are flash sessions.  While useful, this is not a
 concern for this library.
 
 For either of these features, please see one of the libraries below.
-
-Multiple sessions currently require users to designate multiple unique session
-keys per-user.  e.g. `<email>+<deviceid>`
 
 ## Alternatives
 
