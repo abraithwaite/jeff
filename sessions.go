@@ -209,7 +209,25 @@ func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte, meta 
 }
 
 // Clear the session for the given key.
-func (j *Jeff) Clear(ctx context.Context, key []byte) error {
+func (j *Jeff) Clear(ctx context.Context, w http.ResponseWriter) {
+	s := ActiveSession(ctx)
+	c := &http.Cookie{
+		Secure:   !j.insecure,
+		HttpOnly: true,
+		Name:     j.cookieName,
+		Value:    "deleted",
+		Path:     j.path,
+		Domain:   j.domain,
+		Expires:  time.Time{},
+	}
+	http.SetCookie(w, c)
+	if len(s.Key) > 0 {
+		j.clear(ctx, s.Key)
+	}
+}
+
+// Delete the session for the given key.
+func (j *Jeff) Delete(ctx context.Context, key []byte) error {
 	return j.clear(ctx, key)
 }
 

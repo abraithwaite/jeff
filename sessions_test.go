@@ -31,6 +31,10 @@ func (s *server) login(w http.ResponseWriter, r *http.Request) {
 	assert.NoError(s.t, err)
 }
 
+func (s *server) logout(w http.ResponseWriter, r *http.Request) {
+	s.j.Clear(r.Context(), w)
+}
+
 var redir = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 })
@@ -110,6 +114,7 @@ func Suite(t *testing.T, store jeff.Storage) {
 	r.Handle("/authenticated", endpoint)
 	r.Handle("/public", public)
 	r.HandleFunc("/login", s.login)
+	r.HandleFunc("/logout", s.logout)
 
 	var (
 		req             *http.Request
@@ -186,7 +191,7 @@ func Suite(t *testing.T, store jeff.Storage) {
 	})
 
 	t.Run("clear session", func(t *testing.T) {
-		err := j.Clear(context.Background(), email)
+		err := j.Delete(context.Background(), email)
 		assert.NoError(t, err)
 		req = httptest.NewRequest("GET", "http://example.com/authenticated", nil)
 		req.AddCookie(cookie)
@@ -225,6 +230,18 @@ func Suite(t *testing.T, store jeff.Storage) {
 		resp := w.Result()
 		assert.Equal(t, http.StatusOK, resp.StatusCode, "authenticated should succeed")
 		assert.True(t, s.authedPub, "authenticated should set user")
+	})
+
+	t.Run("logout", func(t *testing.T) {
+		req = httptest.NewRequest("GET", "http://example.com/logout", nil)
+		req.Header.Set("User-Agent", "golang-user-agent")
+		w = httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		resp := w.Result()
+		assert.Equal(t, http.StatusOK, resp.StatusCode, "logout should succeed")
+		cookies := resp.Cookies()
+		require.Equal(t, 1, len(cookies), "logout should set cookie")
+		cookie = cookies[0]
 	})
 }
 
