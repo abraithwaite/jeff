@@ -91,8 +91,7 @@ func (s *server) loginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) logoutHandler(w http.ResponseWriter, r *http.Request) {
-	sess := jeff.ActiveSession(r.Context())
-	s.jeff.Clear(r.Context(), sess.Key)
+	s.jeff.Clear(r.Context(), w)
 	http.Redirect(w, r, "/", 302)
 }
 
