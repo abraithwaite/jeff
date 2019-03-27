@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: golang:1.10
+      - image: golang:1.12
       - image: redis
       - image: memcached
 
@@ -12,11 +12,7 @@ jobs:
       - checkout
 
       - run:
-          name: Install dep
-          command: |
-            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-            make deps
-
-      - run:
           name: Run tests
           command: make test
+          environment:
+            GO111MODULE: "on"
