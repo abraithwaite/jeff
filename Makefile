@@ -9,7 +9,7 @@ endif
 
 .PHONY: deps
 deps:
-	$Qdep ensure
+	$Qgo mod download
 
 .PHONY: clean
 clean:
