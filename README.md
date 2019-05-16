@@ -177,3 +177,7 @@ Lightweight, server-only API.  Includes concept of Users in library. No
 wrapping or middleware.
 
 https://github.com/rivo/sessions
+
+Middleware for keeping track of users, login states and permissions.
+
+https://github.com/xyproto/permissions2
