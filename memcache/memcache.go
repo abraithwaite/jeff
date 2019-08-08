@@ -12,7 +12,7 @@ type Store struct {
 	mc *memcache.Client
 }
 
-// New initalizes a new memcache Storage for jeff
+// New initializes a new memcache Storage for jeff
 func New(mc *memcache.Client) *Store {
 	return &Store{mc: mc}
 }

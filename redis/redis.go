@@ -17,7 +17,7 @@ var now = func() time.Time {
 	return time.Now()
 }
 
-// New initalizes a new redis Storage for jeff
+// New initializes a new redis Storage for jeff
 func New(p *redis.Pool) *Store {
 	return &Store{pool: p}
 }
