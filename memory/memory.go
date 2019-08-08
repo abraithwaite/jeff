@@ -21,7 +21,7 @@ type Memory struct {
 	rw       sync.RWMutex
 }
 
-// New initalizes a new in-memory Storage for jeff
+// New initializes a new in-memory Storage for jeff
 func New() *Memory {
 	return &Memory{
 		sessions: make(map[string]item),
