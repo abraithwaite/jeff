@@ -15,6 +15,7 @@ import (
 
 var router = mux.NewRouter()
 
+// User is an example user in your application
 type User struct {
 	Name     string `json:"name"`
 	Password string `json:"password"`

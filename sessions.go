@@ -231,6 +231,8 @@ func (j *Jeff) Delete(ctx context.Context, key []byte) error {
 	return j.clear(ctx, key)
 }
 
+// ActiveSession returns the currently active session on the context. If there
+// is no active session on the context, it returns an empty session object.
 func ActiveSession(ctx context.Context) Session {
 	if v, ok := ctx.Value(sessionKey).(Session); ok {
 		return v

@@ -15,17 +15,20 @@ var now = func() time.Time {
 	return time.Now()
 }
 
+// Memory satisfies the jeff.Storage interface
 type Memory struct {
 	sessions map[string]item
 	rw       sync.RWMutex
 }
 
+// New initalizes a new in-memory Storage for jeff
 func New() *Memory {
 	return &Memory{
 		sessions: make(map[string]item),
 	}
 }
 
+// Store satisfies the jeff.Store.Store method
 func (m *Memory) Store(_ context.Context, key, value []byte, exp time.Time) error {
 	m.rw.Lock()
 	m.sessions[string(key)] = item{
@@ -36,6 +39,7 @@ func (m *Memory) Store(_ context.Context, key, value []byte, exp time.Time) erro
 	return nil
 }
 
+// Fetch satisfies the jeff.Store.Fetch method
 func (m *Memory) Fetch(_ context.Context, key []byte) ([]byte, error) {
 	m.rw.RLock()
 	v, ok := m.sessions[string(key)]
@@ -46,6 +50,7 @@ func (m *Memory) Fetch(_ context.Context, key []byte) ([]byte, error) {
 	return v.value, nil
 }
 
+// Delete satisfies the jeff.Store.Delete method
 func (m *Memory) Delete(_ context.Context, key []byte) error {
 	m.rw.Lock()
 	delete(m.sessions, string(key))
