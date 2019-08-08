@@ -8,6 +8,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 )
 
+// Store satisfies the jeff.Storage interface
 type Store struct {
 	pool *redis.Pool
 }
@@ -16,10 +17,12 @@ var now = func() time.Time {
 	return time.Now()
 }
 
+// New initalizes a new redis Storage for jeff
 func New(p *redis.Pool) *Store {
 	return &Store{pool: p}
 }
 
+// Store satisfies the jeff.Store.Store method
 func (s *Store) Store(ctx context.Context, key, value []byte, exp time.Time) error {
 	conn, err := s.pool.GetContext(ctx)
 	defer conn.Close()
@@ -41,6 +44,7 @@ func (s *Store) Store(ctx context.Context, key, value []byte, exp time.Time) err
 	}
 }
 
+// Fetch satisfies the jeff.Store.Fetch method
 func (s *Store) Fetch(ctx context.Context, key []byte) ([]byte, error) {
 	conn, err := s.pool.GetContext(ctx)
 	defer conn.Close()
@@ -66,6 +70,7 @@ func (s *Store) Fetch(ctx context.Context, key []byte) ([]byte, error) {
 	}
 }
 
+// Delete satisfies the jeff.Store.Delete method
 func (s *Store) Delete(ctx context.Context, key []byte) error {
 	conn, err := s.pool.GetContext(ctx)
 	defer conn.Close()

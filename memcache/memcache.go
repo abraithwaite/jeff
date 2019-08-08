@@ -7,14 +7,17 @@ import (
 	"github.com/bradfitz/gomemcache/memcache"
 )
 
+// Store satisfies the jeff.Storage interface
 type Store struct {
 	mc *memcache.Client
 }
 
+// New initalizes a new memcache Storage for jeff
 func New(mc *memcache.Client) *Store {
 	return &Store{mc: mc}
 }
 
+// Store satisfies the jeff.Store.Store method
 func (s *Store) Store(ctx context.Context, key, value []byte, exp time.Time) error {
 	e := int32(exp.UTC().Unix())
 
@@ -37,6 +40,7 @@ func (s *Store) Store(ctx context.Context, key, value []byte, exp time.Time) err
 	}
 }
 
+// Fetch satisfies the jeff.Store.Fetch method
 func (s *Store) Fetch(ctx context.Context, key []byte) ([]byte, error) {
 	var i *memcache.Item
 	var err error
@@ -61,6 +65,7 @@ func (s *Store) Fetch(ctx context.Context, key []byte) ([]byte, error) {
 	return i.Value, nil
 }
 
+// Delete satisfies the jeff.Store.Delete method
 func (s *Store) Delete(ctx context.Context, key []byte) error {
 	var err error
 	done := make(chan struct{})
