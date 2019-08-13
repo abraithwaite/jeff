@@ -3,18 +3,20 @@ package jeff_test
 import (
 	"context"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/abraithwaite/jeff"
-	"github.com/abraithwaite/jeff/memcache"
+	memcache_store "github.com/abraithwaite/jeff/memcache"
 	"github.com/abraithwaite/jeff/memory"
-	"github.com/abraithwaite/jeff/redis"
+	redis_store "github.com/abraithwaite/jeff/redis"
 	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/gomodule/redigo/redis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/net/publicsuffix"
 )
 
 type server struct {
@@ -116,133 +118,139 @@ func Suite(t *testing.T, store jeff.Storage) {
 	r.HandleFunc("/login", s.login)
 	r.HandleFunc("/logout", s.logout)
 
-	var (
-		req             *http.Request
-		w               *httptest.ResponseRecorder
-		cookie, cookie2 *http.Cookie
-	)
-
+	var cookie *http.Cookie
 	rec := time.Now().UTC().Truncate(time.Second)
 	jeff.SetTime(func() time.Time { return rec })
 
-	t.Run("not authenticated", func(t *testing.T) {
-		req = httptest.NewRequest("GET", "http://example.com/authenticated", nil)
-		w = httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		resp := w.Result()
-		assert.Equal(t, http.StatusFound, resp.StatusCode, "unauthenticated requests should redirect")
-		assert.Equal(t, "/login", resp.Header.Get("Location"), "unauthenticated requests should redirect")
-	})
+	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	require.NoError(t, err, "should not error")
 
-	t.Run("login", func(t *testing.T) {
-		req = httptest.NewRequest("GET", "http://example.com/login", nil)
-		req.Header.Set("User-Agent", "golang-user-agent")
-		w = httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		resp := w.Result()
-		assert.Equal(t, http.StatusOK, resp.StatusCode, "login should succeed")
-		cookies := resp.Cookies()
-		require.Equal(t, 1, len(cookies), "login should set cookie")
-		cookie = cookies[0]
-		assert.Equal(t, true, cookie.Secure, "cookie should be Secure")
-		assert.Equal(t, true, cookie.HttpOnly, "cookie should be HttpOnly")
-		assert.Equal(t, "example.com", cookie.Domain, "cookie Domain should be set")
-		assert.Equal(t, "session", cookie.Name, "cookie Name should be set")
-		assert.Equal(t, rec.Add(exp), cookie.Expires, "cookie Name should be set")
-	})
+	var cases = []struct {
+		Name     string
+		req      func() *http.Request
+		validate func(*testing.T, *http.Response)
+	}{
+		{
+			Name: "not authenticated",
+			req: func() *http.Request {
+				return httptest.NewRequest("GET", "https://example.com/authenticated", nil)
+			},
+			validate: func(t *testing.T, resp *http.Response) {
+				assert.Equal(t, http.StatusFound, resp.StatusCode, "unauthenticated requests should redirect")
+				assert.Equal(t, "/login", resp.Header.Get("Location"), "unauthenticated requests should redirect")
+			},
+		},
+		{
+			Name: "login",
+			req: func() *http.Request {
+				req := httptest.NewRequest("GET", "https://example.com/login", nil)
+				req.Header.Set("User-Agent", "golang-user-agent")
+				return req
+			},
+			validate: func(t *testing.T, resp *http.Response) {
+				assert.Equal(t, http.StatusOK, resp.StatusCode, "login should succeed")
+				cookies := resp.Cookies()
+				require.Equal(t, 1, len(cookies), "login should set cookie")
+				cookie = cookies[0]
+				assert.Equal(t, true, cookie.Secure, "cookie should be Secure")
+				assert.Equal(t, true, cookie.HttpOnly, "cookie should be HttpOnly")
+				assert.Equal(t, "example.com", cookie.Domain, "cookie Domain should be set")
+				assert.Equal(t, "session", cookie.Name, "cookie Name should be set")
+				assert.Equal(t, rec.Add(exp), cookie.Expires, "cookie Name should be set")
+			},
+		},
+		{
+			Name: "authenticated",
+			req:  func() *http.Request { return httptest.NewRequest("GET", "https://example.com/authenticated", nil) },
+			validate: func(t *testing.T, resp *http.Response) {
+				assert.Equal(t, http.StatusOK, resp.StatusCode, "authenticated should succeed")
+			},
+		},
+		{
+			Name: "new login",
+			req:  func() *http.Request { return httptest.NewRequest("GET", "https://example.com/login", nil) },
+			validate: func(t *testing.T, resp *http.Response) {
+				assert.Equal(t, http.StatusOK, resp.StatusCode, "login should succeed")
+				cookies := resp.Cookies()
+				require.Equal(t, 1, len(cookies), "login should set cookie")
+				assert.NotEqual(t, cookie, cookies[0], "logging in again should assign new session")
+			},
+		},
+		{
+			Name: "authenticated new session",
+			req:  func() *http.Request { return httptest.NewRequest("GET", "https://example.com/authenticated", nil) },
+			validate: func(t *testing.T, resp *http.Response) {
+				assert.Equal(t, http.StatusOK, resp.StatusCode, "new session should be valid")
+			},
+		},
+		{
+			Name: "older session still works",
+			req: func() *http.Request {
+				req := httptest.NewRequest("GET", "https://example.com/authenticated", nil)
+				// recall old cookie. Override session cookie from previous test case
+				jar.SetCookies(req.URL, []*http.Cookie{cookie})
+				return req
+			},
+			validate: func(t *testing.T, resp *http.Response) {
+				assert.Equal(t, http.StatusOK, resp.StatusCode, "old session should be valid")
+			},
+		},
+		{
+			Name: "clear session",
+			req: func() *http.Request {
+				err := j.Delete(context.Background(), email)
+				assert.NoError(t, err)
+				return httptest.NewRequest("GET", "https://example.com/authenticated", nil)
+			},
+			validate: func(t *testing.T, resp *http.Response) {
+				assert.Equal(t, http.StatusFound, resp.StatusCode, "unauthenticated requests should redirect")
+				assert.Equal(t, "/login", resp.Header.Get("Location"), "unauthenticated requests should redirect")
+			},
+		},
+		{
+			Name: "not authenticated and public url",
+			req:  func() *http.Request { return httptest.NewRequest("GET", "https://example.com/public", nil) },
+			validate: func(t *testing.T, resp *http.Response) {
+				assert.Equal(t, http.StatusOK, resp.StatusCode, "unauthenticated requests should not redirect")
+			},
+		},
+		{
+			Name: "login to test authed public route",
+			req:  func() *http.Request { return httptest.NewRequest("GET", "https://example.com/login", nil) },
+			validate: func(t *testing.T, resp *http.Response) {
+				assert.Equal(t, http.StatusOK, resp.StatusCode, "login should succeed")
+			},
+		},
+		{
+			Name: "authed public route",
+			req:  func() *http.Request { return httptest.NewRequest("GET", "https://example.com/public", nil) },
+			validate: func(t *testing.T, resp *http.Response) {
+				assert.Equal(t, http.StatusOK, resp.StatusCode, "authenticated should succeed")
+				assert.True(t, s.authedPub, "authenticated should set user")
+			},
+		},
+		{
+			Name: "logout",
+			req:  func() *http.Request { return httptest.NewRequest("GET", "https://example.com/logout", nil) },
+			validate: func(t *testing.T, resp *http.Response) {
+				assert.Equal(t, http.StatusOK, resp.StatusCode, "logout should succeed")
+			},
+		},
+	}
 
-	t.Run("authenticated", func(t *testing.T) {
-		req = httptest.NewRequest("GET", "http://example.com/authenticated", nil)
-		req.AddCookie(cookie)
-		w = httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		resp := w.Result()
-		assert.Equal(t, http.StatusOK, resp.StatusCode, "authenticated should succeed")
-	})
-
-	t.Run("new login", func(t *testing.T) {
-		req = httptest.NewRequest("GET", "http://example.com/login", nil)
-		w = httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		resp := w.Result()
-		assert.Equal(t, http.StatusOK, resp.StatusCode, "login should succeed")
-		cookies := resp.Cookies()
-		require.Equal(t, 1, len(cookies), "login should set cookie")
-		cookie2 = cookies[0]
-		assert.NotEqual(t, cookie, cookie2, "logging in again should assign new session")
-	})
-
-	t.Run("authenticated new session", func(t *testing.T) {
-		req = httptest.NewRequest("GET", "http://example.com/authenticated", nil)
-		req.AddCookie(cookie2)
-		w = httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		resp := w.Result()
-		assert.Equal(t, http.StatusOK, resp.StatusCode, "new session should be valid")
-	})
-
-	t.Run("authenticated old session", func(t *testing.T) {
-		req = httptest.NewRequest("GET", "http://example.com/authenticated", nil)
-		req.AddCookie(cookie)
-		w = httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		resp := w.Result()
-		assert.Equal(t, http.StatusOK, resp.StatusCode, "old session should be valid")
-	})
-
-	t.Run("clear session", func(t *testing.T) {
-		err := j.Delete(context.Background(), email)
-		assert.NoError(t, err)
-		req = httptest.NewRequest("GET", "http://example.com/authenticated", nil)
-		req.AddCookie(cookie)
-		w = httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		resp := w.Result()
-		assert.Equal(t, http.StatusFound, resp.StatusCode, "unauthenticated requests should redirect")
-		assert.Equal(t, "/login", resp.Header.Get("Location"), "unauthenticated requests should redirect")
-	})
-
-	t.Run("not authenticated public", func(t *testing.T) {
-		req = httptest.NewRequest("GET", "http://example.com/public", nil)
-		w = httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		resp := w.Result()
-		assert.Equal(t, http.StatusOK, resp.StatusCode, "unauthenticated requests should not redirect")
-	})
-
-	t.Run("login", func(t *testing.T) {
-		req = httptest.NewRequest("GET", "http://example.com/login", nil)
-		req.Header.Set("User-Agent", "golang-user-agent")
-		w = httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		resp := w.Result()
-		assert.Equal(t, http.StatusOK, resp.StatusCode, "login should succeed")
-		cookies := resp.Cookies()
-		require.Equal(t, 1, len(cookies), "login should set cookie")
-		cookie = cookies[0]
-	})
-
-	t.Run("authenticated public", func(t *testing.T) {
-		req = httptest.NewRequest("GET", "http://example.com/public", nil)
-		req.AddCookie(cookie)
-		w = httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		resp := w.Result()
-		assert.Equal(t, http.StatusOK, resp.StatusCode, "authenticated should succeed")
-		assert.True(t, s.authedPub, "authenticated should set user")
-	})
-
-	t.Run("logout", func(t *testing.T) {
-		req = httptest.NewRequest("GET", "http://example.com/logout", nil)
-		req.Header.Set("User-Agent", "golang-user-agent")
-		w = httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		resp := w.Result()
-		assert.Equal(t, http.StatusOK, resp.StatusCode, "logout should succeed")
-		cookies := resp.Cookies()
-		require.Equal(t, 1, len(cookies), "logout should set cookie")
-		cookie = cookies[0]
-	})
+	for _, c := range cases {
+		t.Run(c.Name, func(t *testing.T) {
+			req := c.req()
+			for _, cookie := range jar.Cookies(req.URL) {
+				req.AddCookie(cookie)
+			}
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			resp := w.Result()
+			c.validate(t, resp)
+			jar.SetCookies(req.URL, resp.Cookies())
+		})
+	}
 }
 
 func SuiteExpires(t *testing.T, store jeff.Storage) {
@@ -272,7 +280,7 @@ func SuiteExpires(t *testing.T, store jeff.Storage) {
 	t.Run("token expires serverside", func(t *testing.T) {
 
 		// Setup cookie
-		req := httptest.NewRequest("GET", "http://example.com/login", nil)
+		req := httptest.NewRequest("GET", "https://example.com/login", nil)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 		resp := w.Result()
@@ -283,7 +291,7 @@ func SuiteExpires(t *testing.T, store jeff.Storage) {
 		time.Sleep(2 * time.Second)
 
 		// Setup second session, expiring later
-		req = httptest.NewRequest("GET", "http://example.com/login", nil)
+		req = httptest.NewRequest("GET", "https://example.com/login", nil)
 		w = httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 		resp = w.Result()
@@ -291,7 +299,7 @@ func SuiteExpires(t *testing.T, store jeff.Storage) {
 
 		time.Sleep(3 * time.Second)
 
-		req = httptest.NewRequest("GET", "http://example.com/authenticated", nil)
+		req = httptest.NewRequest("GET", "https://example.com/authenticated", nil)
 		req.AddCookie(cookie)
 		w = httptest.NewRecorder()
 		r.ServeHTTP(w, req)
@@ -299,7 +307,7 @@ func SuiteExpires(t *testing.T, store jeff.Storage) {
 		assert.Equal(t, http.StatusFound, resp.StatusCode, "session should expire serverside")
 
 		// Setup second session, expiring later
-		req = httptest.NewRequest("GET", "http://example.com/login", nil)
+		req = httptest.NewRequest("GET", "https://example.com/login", nil)
 		w = httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 		resp = w.Result()
@@ -307,7 +315,7 @@ func SuiteExpires(t *testing.T, store jeff.Storage) {
 
 		time.Sleep(1 * time.Second)
 
-		req = httptest.NewRequest("GET", "http://example.com/authenticated", nil)
+		req = httptest.NewRequest("GET", "https://example.com/authenticated", nil)
 		req.AddCookie(cookie)
 		w = httptest.NewRecorder()
 		r.ServeHTTP(w, req)
@@ -322,7 +330,7 @@ func TestInsecure(t *testing.T) {
 	s := &server{j: j, t: t}
 	r := http.NewServeMux()
 	r.HandleFunc("/login", s.login)
-	req := httptest.NewRequest("GET", "http://example.com/login", nil)
+	req := httptest.NewRequest("GET", "https://example.com/login", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	resp := w.Result()
@@ -338,7 +346,7 @@ func TestSessCookie(t *testing.T) {
 	s := &server{j: j, t: t}
 	r := http.NewServeMux()
 	r.HandleFunc("/login", s.login)
-	req := httptest.NewRequest("GET", "http://example.com/login", nil)
+	req := httptest.NewRequest("GET", "https://example.com/login", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	resp := w.Result()
