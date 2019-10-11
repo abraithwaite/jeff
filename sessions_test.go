@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/abraithwaite/jeff"
-	"github.com/abraithwaite/jeff/memcache"
+	memcache_store "github.com/abraithwaite/jeff/memcache"
 	"github.com/abraithwaite/jeff/memory"
-	"github.com/abraithwaite/jeff/redis"
+	redis_store "github.com/abraithwaite/jeff/redis"
 	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/gomodule/redigo/redis"
 	"github.com/stretchr/testify/assert"
@@ -24,6 +24,7 @@ type server struct {
 	authedPub bool
 }
 
+// email is intentionally invalid
 var email = []byte("super@exa::mple.com")
 
 func (s *server) login(w http.ResponseWriter, r *http.Request) {
@@ -188,6 +189,12 @@ func Suite(t *testing.T, store jeff.Storage) {
 		r.ServeHTTP(w, req)
 		resp := w.Result()
 		assert.Equal(t, http.StatusOK, resp.StatusCode, "old session should be valid")
+	})
+
+	t.Run("get all sessions", func(t *testing.T) {
+		sessions, err := j.SessionsForKey(context.Background(), email)
+		assert.NoError(t, err)
+		assert.Equal(t, 2, len(sessions), "two active sessions should be returned")
 	})
 
 	t.Run("clear session", func(t *testing.T) {
