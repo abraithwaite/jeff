@@ -240,6 +240,12 @@ func ActiveSession(ctx context.Context) Session {
 	return Session{}
 }
 
+// SessionsForKey returns the list of active sessions that exist in the
+// backend for the given key.  The result may have stale (expired) sessions.
+func (j *Jeff) SessionsForKey(ctx context.Context, key []byte) (SessionList, error) {
+	return j.load(ctx, key)
+}
+
 func (j *Jeff) defaults() {
 	if j.redir == nil {
 		j.redir = defaultRedirect
