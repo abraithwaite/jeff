@@ -223,7 +223,7 @@ func (j *Jeff) Clear(ctx context.Context, w http.ResponseWriter) error {
 	http.SetCookie(w, c)
 	if len(s.Key) > 0 {
 		// TODO: a bit worried about corrupt (empty) tokens.
-		j.clear(ctx, s.Key, s.Token)
+		return j.clear(ctx, s.Key, s.Token)
 	}
 	return nil
 }

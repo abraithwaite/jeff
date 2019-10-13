@@ -144,12 +144,25 @@ application:  `go run ./cmd/example/main.go`.
 
 ## Limitations
 
-At this time, this library does not implement arbitrary key/value storage.
+Also excluded from this library are flash sessions.  While useful, this is not
+a concern for this library.  If you need this feature, please see one of the
+libraries below.
 
-Also excluded from this library are flash sessions.  While useful, this is not a
-concern for this library.
+### Race Conditions
 
-For either of these features, please see one of the libraries below.
+There is a race conditions inherant in how this library handles expiration and
+deletion of sessions.  Because sessions are stored as a list for each user, to
+add, delete, or prune sessions, it's required to do a read, modify, write
+without any kind of transaction.  That means that it's possible, for example,
+for a new session to be wiped out if it's created between reading and writing
+in another concurrent read-modify-write operation, or for a session which was
+meant to be cleared, didn't get cleared because the clear was issued during
+another processes' modify step in the read-modify-write cycle.
+
+In practice, this should be quite rare but for people considering this for
+short-lived sessions with high numbers of concurrent sessions per user, you
+might want to reconsider.
+
 
 ## Alternatives
 

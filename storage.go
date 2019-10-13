@@ -89,6 +89,8 @@ func (j *Jeff) store(ctx context.Context, s Session) error {
 	return j.s.Store(ctx, s.Key, bts, now().Add(24*30*time.Hour))
 }
 
+// Clear deletes all sessions for a given key, or it deletes the selected
+// sessions if a list of tokens is given.
 func (j *Jeff) clear(ctx context.Context, key []byte, tokens ...[]byte) error {
 	if len(tokens) == 0 {
 		return j.s.Delete(ctx, key)
