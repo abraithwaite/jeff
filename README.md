@@ -150,7 +150,7 @@ libraries below.
 
 ### Race Conditions
 
-There is a race conditions inherant in how this library handles expiration and
+There is a race condition inherant in how this library handles expiration and
 deletion of sessions.  Because sessions are stored as a list for each user, to
 add, delete, or prune sessions, it's required to do a read, modify, write
 without any kind of transaction.  That means that it's possible, for example,
@@ -162,6 +162,7 @@ another processes' modify step in the read-modify-write cycle.
 In practice, this should be quite rare but for people considering this for
 short-lived sessions with high numbers of concurrent sessions per user, you
 might want to reconsider.
+
 
 
 ## Alternatives

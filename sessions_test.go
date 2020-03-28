@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -192,7 +193,36 @@ func Suite(t *testing.T, store jeff.Storage) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode, "old session should be valid")
 	})
 
+	t.Run("third login", func(t *testing.T) {
+		req = httptest.NewRequest("GET", "http://example.com/login", nil)
+		w = httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		resp := w.Result()
+		assert.Equal(t, http.StatusOK, resp.StatusCode, "login should succeed")
+		cookies := resp.Cookies()
+		require.Equal(t, 1, len(cookies), "login should set cookie")
+		cookie2 = cookies[0]
+	})
+
 	t.Run("get all sessions", func(t *testing.T) {
+		sessions, err := j.SessionsForKey(context.Background(), email)
+		assert.NoError(t, err)
+		assert.Equal(t, 3, len(sessions), "two active sessions should be returned")
+	})
+
+	t.Run("clear one session", func(t *testing.T) {
+		vals := strings.SplitN(cookie2.Value, "::", 2)
+		assert.Equal(t, 2, len(vals), "invalid cookie value")
+		err := j.Delete(context.Background(), email, []byte(vals[1]))
+		assert.NoError(t, err)
+		req = httptest.NewRequest("GET", "http://example.com/authenticated", nil)
+		req.AddCookie(cookie2)
+		w = httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		resp := w.Result()
+		assert.Equal(t, http.StatusFound, resp.StatusCode, "unauthenticated requests should redirect")
+		assert.Equal(t, "/login", resp.Header.Get("Location"), "unauthenticated requests should redirect")
+
 		sessions, err := j.SessionsForKey(context.Background(), email)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(sessions), "two active sessions should be returned")

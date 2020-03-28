@@ -101,7 +101,9 @@ func (j *Jeff) clear(ctx context.Context, key []byte, tokens ...[]byte) error {
 		return err
 	}
 
-	// if it's found, remove it
+	// if it's found, remove it.  This is O(N**2).  Not sure what the best way
+	// to avoid this is.  Might want to impose limits on the number of sessions
+	// per user and tokens passed into clear.
 	for _, tok := range tokens {
 		if _, i := find(sl, tok); i >= 0 {
 			sl = append(sl[:i], sl[i+1:]...)
