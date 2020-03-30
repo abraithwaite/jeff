@@ -208,8 +208,8 @@ func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte, meta 
 	})
 }
 
-// Clear the session for the given key.
-func (j *Jeff) Clear(ctx context.Context, w http.ResponseWriter) {
+// Clear the session in the context for the given key.
+func (j *Jeff) Clear(ctx context.Context, w http.ResponseWriter) error {
 	s := ActiveSession(ctx)
 	c := &http.Cookie{
 		Secure:   !j.insecure,
@@ -222,13 +222,15 @@ func (j *Jeff) Clear(ctx context.Context, w http.ResponseWriter) {
 	}
 	http.SetCookie(w, c)
 	if len(s.Key) > 0 {
-		j.clear(ctx, s.Key)
+		// TODO: a bit worried about corrupt (empty) tokens.
+		return j.clear(ctx, s.Key, s.Token)
 	}
+	return nil
 }
 
 // Delete the session for the given key.
-func (j *Jeff) Delete(ctx context.Context, key []byte) error {
-	return j.clear(ctx, key)
+func (j *Jeff) Delete(ctx context.Context, key []byte, tokens ...[]byte) error {
+	return j.clear(ctx, key, tokens...)
 }
 
 // ActiveSession returns the currently active session on the context. If there

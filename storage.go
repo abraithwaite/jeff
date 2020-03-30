@@ -89,6 +89,33 @@ func (j *Jeff) store(ctx context.Context, s Session) error {
 	return j.s.Store(ctx, s.Key, bts, now().Add(24*30*time.Hour))
 }
 
-func (j *Jeff) clear(ctx context.Context, key []byte) error {
-	return j.s.Delete(ctx, key)
+// Clear deletes all sessions for a given key, or it deletes the selected
+// sessions if a list of tokens is given.
+func (j *Jeff) clear(ctx context.Context, key []byte, tokens ...[]byte) error {
+	if len(tokens) == 0 {
+		return j.s.Delete(ctx, key)
+	}
+
+	sl, err := j.load(ctx, key)
+	if err != nil {
+		return err
+	}
+
+	// if it's found, remove it.  This is O(N**2).  Not sure what the best way
+	// to avoid this is.  Might want to impose limits on the number of sessions
+	// per user and tokens passed into clear.
+	for _, tok := range tokens {
+		if _, i := find(sl, tok); i >= 0 {
+			sl = append(sl[:i], sl[i+1:]...)
+		}
+	}
+
+	// prune expired sessions
+	sl = prune(sl)
+	bts, err := sl.MarshalMsg(nil)
+	if err != nil {
+		return err
+	}
+	// Global Expiration 30d, TODO: make configurable
+	return j.s.Store(ctx, key, bts, now().Add(24*30*time.Hour))
 }

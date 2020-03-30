@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,7 +34,8 @@ func (s *server) login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) logout(w http.ResponseWriter, r *http.Request) {
-	s.j.Clear(r.Context(), w)
+	err := s.j.Clear(r.Context(), w)
+	assert.NoError(s.t, err)
 }
 
 var redir = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +117,7 @@ func Suite(t *testing.T, store jeff.Storage) {
 	r.Handle("/authenticated", endpoint)
 	r.Handle("/public", public)
 	r.HandleFunc("/login", s.login)
-	r.HandleFunc("/logout", s.logout)
+	r.Handle("/logout", j.Wrap(http.HandlerFunc(s.logout)))
 
 	var (
 		req             *http.Request
@@ -191,13 +193,42 @@ func Suite(t *testing.T, store jeff.Storage) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode, "old session should be valid")
 	})
 
+	t.Run("third login", func(t *testing.T) {
+		req = httptest.NewRequest("GET", "http://example.com/login", nil)
+		w = httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		resp := w.Result()
+		assert.Equal(t, http.StatusOK, resp.StatusCode, "login should succeed")
+		cookies := resp.Cookies()
+		require.Equal(t, 1, len(cookies), "login should set cookie")
+		cookie2 = cookies[0]
+	})
+
 	t.Run("get all sessions", func(t *testing.T) {
+		sessions, err := j.SessionsForKey(context.Background(), email)
+		assert.NoError(t, err)
+		assert.Equal(t, 3, len(sessions), "two active sessions should be returned")
+	})
+
+	t.Run("clear one session", func(t *testing.T) {
+		vals := strings.SplitN(cookie2.Value, "::", 2)
+		assert.Equal(t, 2, len(vals), "invalid cookie value")
+		err := j.Delete(context.Background(), email, []byte(vals[1]))
+		assert.NoError(t, err)
+		req = httptest.NewRequest("GET", "http://example.com/authenticated", nil)
+		req.AddCookie(cookie2)
+		w = httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		resp := w.Result()
+		assert.Equal(t, http.StatusFound, resp.StatusCode, "unauthenticated requests should redirect")
+		assert.Equal(t, "/login", resp.Header.Get("Location"), "unauthenticated requests should redirect")
+
 		sessions, err := j.SessionsForKey(context.Background(), email)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(sessions), "two active sessions should be returned")
 	})
 
-	t.Run("clear session", func(t *testing.T) {
+	t.Run("clear all sessions", func(t *testing.T) {
 		err := j.Delete(context.Background(), email)
 		assert.NoError(t, err)
 		req = httptest.NewRequest("GET", "http://example.com/authenticated", nil)
@@ -207,6 +238,12 @@ func Suite(t *testing.T, store jeff.Storage) {
 		resp := w.Result()
 		assert.Equal(t, http.StatusFound, resp.StatusCode, "unauthenticated requests should redirect")
 		assert.Equal(t, "/login", resp.Header.Get("Location"), "unauthenticated requests should redirect")
+	})
+
+	t.Run("get all sessions", func(t *testing.T) {
+		sessions, err := j.SessionsForKey(context.Background(), email)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(sessions), "two active sessions should be returned")
 	})
 
 	t.Run("not authenticated public", func(t *testing.T) {
@@ -242,14 +279,21 @@ func Suite(t *testing.T, store jeff.Storage) {
 	t.Run("logout", func(t *testing.T) {
 		req = httptest.NewRequest("GET", "http://example.com/logout", nil)
 		req.Header.Set("User-Agent", "golang-user-agent")
+		req.AddCookie(cookie)
 		w = httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 		resp := w.Result()
 		assert.Equal(t, http.StatusOK, resp.StatusCode, "logout should succeed")
 		cookies := resp.Cookies()
 		require.Equal(t, 1, len(cookies), "logout should set cookie")
-		cookie = cookies[0]
 	})
+
+	t.Run("get all sessions", func(t *testing.T) {
+		sessions, err := j.SessionsForKey(context.Background(), email)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(sessions), "two active sessions should be returned")
+	})
+
 }
 
 func SuiteExpires(t *testing.T, store jeff.Storage) {
@@ -322,6 +366,8 @@ func SuiteExpires(t *testing.T, store jeff.Storage) {
 		assert.Equal(t, http.StatusFound, resp.StatusCode, "session should expire serverside")
 	})
 
+	err := j.Delete(context.Background(), email)
+	assert.NoError(t, err)
 }
 
 func TestInsecure(t *testing.T) {
