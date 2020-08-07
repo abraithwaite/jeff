@@ -36,6 +36,7 @@ type Jeff struct {
 	path       string
 	expires    time.Duration
 	insecure   bool
+	samesite   http.SameSite
 }
 
 // Domain sets the domain the cookie belongs to.  If unset, cookie becomes a
@@ -99,6 +100,16 @@ func Expires(dur time.Duration) func(*Jeff) {
 func Insecure(j *Jeff) {
 	log.Println("ERROR: sessions configured insecurely. for development only")
 	j.insecure = true
+}
+
+// SameSite sets the SameSite attribute for the cookie.  If unset, the default
+// behavior is to inherit the default behavior of the http package.  See the
+// docs for details.
+// https://pkg.go.dev/net/http?tab=doc#SameSite
+func Samesite(s http.SameSite) func(*Jeff) {
+	return func(j *Jeff) {
+		j.samesite = s
+	}
 }
 
 // New instantiates a Jeff, applying the options provided.
@@ -183,6 +194,7 @@ func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte, meta 
 		Value:    strings.Join([]string{encode(key), secure}, separator),
 		Path:     j.path,
 		Domain:   j.domain,
+		SameSite: j.samesite,
 	}
 	var exp time.Time
 	if j.expires != 0 {
@@ -193,9 +205,6 @@ func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte, meta 
 		exp = now().Add(30 * 24 * time.Hour)
 	}
 	http.SetCookie(w, c)
-	// Prevent CSRF.  SameSite attribute added in Go1.11
-	// https://golang.org/cl/79919
-	w.Header().Set("Set-Cookie", w.Header().Get("Set-Cookie")+"; SameSite=lax")
 	var m []byte
 	if len(meta) == 1 {
 		m = meta[0]

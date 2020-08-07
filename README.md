@@ -28,6 +28,13 @@ details.
 - Fast
 - Multiple sessions under one key
 
+## Requirements
+
+The module uses msgpack for encoding and requires a recent version of Go to
+function.  It's recommended to have a version no older than 1 year, but
+there's a hard requirement to have at least Go 1.11+.  Tests are only done
+against the latest stable version of Go.
+
 ## Usage
 
 There are three primary methods:
