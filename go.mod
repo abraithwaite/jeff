@@ -8,5 +8,5 @@ require (
 	github.com/gorilla/handlers v1.4.0
 	github.com/gorilla/mux v1.7.0
 	github.com/stretchr/testify v1.5.1
-	github.com/tinylib/msgp v1.1.5
+	github.com/tinylib/msgp v1.1.6
 )
