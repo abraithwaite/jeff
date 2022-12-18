@@ -2,6 +2,9 @@ package jeff_test
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,8 +15,10 @@ import (
 	memcache_store "github.com/abraithwaite/jeff/memcache"
 	"github.com/abraithwaite/jeff/memory"
 	redis_store "github.com/abraithwaite/jeff/redis"
+	"github.com/abraithwaite/jeff/sqlite"
 	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/gomodule/redigo/redis"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -93,6 +98,35 @@ func TestRedisExpires(t *testing.T) {
 		Dial:        func() (redis.Conn, error) { return redis.Dial("tcp", "localhost:6379") },
 	}
 	str := redis_store.New(p)
+	SuiteExpires(t, str)
+}
+
+// sqliteDbPath creates a path to an ephemeral, in-memory SQLite database path,
+// choosing a random name to ensure that we don't re-use the same database path
+// during multiple tests.
+func sqliteDbPath() string {
+	charset := []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
+	runes := make([]rune, 10)
+	for i := range runes {
+		runes[i] = charset[rand.Intn(len(charset))]
+	}
+	name := string(runes)
+	return fmt.Sprintf("file:%s?mode=memory&cache=shared", name)
+}
+
+func TestSqlite(t *testing.T) {
+	db, err := sql.Open("sqlite3", sqliteDbPath())
+	assert.NoError(t, err)
+	str, err := sqlite.New(db)
+	assert.NoError(t, err)
+	Suite(t, str)
+}
+
+func TestSqliteExpires(t *testing.T) {
+	db, err := sql.Open("sqlite3", sqliteDbPath())
+	assert.NoError(t, err)
+	str, err := sqlite.New(db)
+	assert.NoError(t, err)
 	SuiteExpires(t, str)
 }
 
