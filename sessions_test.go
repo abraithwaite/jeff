@@ -125,7 +125,7 @@ func TestSqlite(t *testing.T) {
 func TestSqliteExpires(t *testing.T) {
 	db, err := sql.Open("sqlite3", sqliteDbPath())
 	assert.NoError(t, err)
-	str, err := sqlite.New(db)
+	str, err := sqlite.New(db, sqlite.CleanupInterval(1*time.Second))
 	assert.NoError(t, err)
 	SuiteExpires(t, str)
 }
