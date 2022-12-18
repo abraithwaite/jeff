@@ -86,15 +86,17 @@ func (s *Store) Store(_ context.Context, key, value []byte, exp time.Time) error
 
 // Fetch satisfies the jeff.Store.Fetch method.
 func (s *Store) Fetch(_ context.Context, key []byte) ([]byte, error) {
-	var value []byte
-	if err := s.db.QueryRow(fmt.Sprintf(`
+	q := fmt.Sprintf(`
 	SELECT
 		value
 	FROM
 		%s
 	WHERE
 		key = ? AND
-		expires_at > datetime('now', 'localtime')`, s.tableName), string(key)).Scan(&value); err != nil {
+		expires_at > datetime('now', 'localtime')`, s.tableName)
+
+	var value []byte
+	if err := s.db.QueryRow(q, string(key)).Scan(&value); err != nil {
 		// Not found sessions must return nil value, nil error.
 		if err == sql.ErrNoRows {
 			return nil, nil
