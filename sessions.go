@@ -220,16 +220,15 @@ func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte, meta 
 // Clear the session in the context for the given key.
 func (j *Jeff) Clear(ctx context.Context, w http.ResponseWriter) error {
 	s := ActiveSession(ctx)
-	c := &http.Cookie{
+	http.SetCookie(w, &http.Cookie{
 		Secure:   !j.insecure,
 		HttpOnly: true,
 		Name:     j.cookieName,
 		Value:    "deleted",
 		Path:     j.path,
 		Domain:   j.domain,
-		Expires:  time.Time{},
-	}
-	http.SetCookie(w, c)
+		Expires:  time.Unix(0, 0),
+	})
 	if len(s.Key) > 0 {
 		// TODO: a bit worried about corrupt (empty) tokens.
 		return j.clear(ctx, s.Key, s.Token)
