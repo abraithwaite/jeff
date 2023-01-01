@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -98,7 +97,6 @@ func Expires(dur time.Duration) func(*Jeff) {
 // Insecure unsets the Secure flag for the cookie.  This is for development
 // only.  Doing this in production is an error.
 func Insecure(j *Jeff) {
-	log.Println("ERROR: sessions configured insecurely. for development only")
 	j.insecure = true
 }
 
