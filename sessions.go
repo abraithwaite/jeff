@@ -4,10 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"log"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // Cookie Format
@@ -59,10 +62,10 @@ func CookieName(n string) func(*Jeff) {
 // default, this redirects to '/'. It's recommended that you replace this with
 // your own.
 //
-//     sessions := jeff.New(store, jeff.Redirect(
-//         http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-//             http.Redirect(w, r, "/login", http.StatusFound)
-//         })))
+//	sessions := jeff.New(store, jeff.Redirect(
+//	    http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+//	        http.Redirect(w, r, "/login", http.StatusFound)
+//	    })))
 //
 // Setting this is particularly useful if you want to stop a redirect on an
 // authenticated route to render a page despite the user not being
@@ -182,7 +185,7 @@ func (j *Jeff) wrap(redir, wrap http.Handler) http.Handler {
 // Set the session cookie on the response.  Call after successful
 // authentication / login.  meta optional parameter sets metadata in the
 // session storage.
-func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte, meta ...[]byte) error {
+func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte, meta ...any) error {
 	if len(meta) > 1 {
 		panic("meta must not be longer than 1")
 	}
@@ -205,21 +208,24 @@ func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte, meta 
 		exp = now().Add(30 * 24 * time.Hour)
 	}
 	http.SetCookie(w, c)
-	var m []byte
-	if len(meta) == 1 {
-		m = meta[0]
+	metSer, err := msgpack.Marshal(meta[0])
+	if err != nil {
+		return err
 	}
 	return j.store(ctx, Session{
 		Key:   key,
 		Token: []byte(secure),
 		Exp:   exp,
-		Meta:  m,
+		Meta:  metSer,
 	})
 }
 
 // Clear the session in the context for the given key.
 func (j *Jeff) Clear(ctx context.Context, w http.ResponseWriter) error {
-	s := ActiveSession(ctx)
+	s, ok := ActiveSession(ctx)
+	if !ok {
+		return errors.New("no session found on context")
+	}
 	c := &http.Cookie{
 		Secure:   !j.insecure,
 		HttpOnly: true,
@@ -242,13 +248,19 @@ func (j *Jeff) Delete(ctx context.Context, key []byte, tokens ...[]byte) error {
 	return j.clear(ctx, key, tokens...)
 }
 
+// SessionFromRequest returns the currently active session on the request
+// context. If there is no active session on the context, it returns an empty
+// session object and false.
+func SessionFromRequest(r *http.Request) (Session, bool) {
+	return ActiveSession(r.Context())
+}
+
 // ActiveSession returns the currently active session on the context. If there
-// is no active session on the context, it returns an empty session object.
-func ActiveSession(ctx context.Context) Session {
-	if v, ok := ctx.Value(sessionKey).(Session); ok {
-		return v
-	}
-	return Session{}
+// is no active session on the context, it returns an empty session object and
+// false.
+func ActiveSession(ctx context.Context) (Session, bool) {
+	v, ok := ctx.Value(sessionKey).(Session)
+	return v, ok
 }
 
 // SessionsForKey returns the list of active sessions that exist in the

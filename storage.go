@@ -5,6 +5,8 @@ import (
 	"crypto/subtle"
 	"errors"
 	"time"
+
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // Storage provides the base level abstraction for implementing session
@@ -43,7 +45,7 @@ func (j *Jeff) load(ctx context.Context, key []byte) (SessionList, error) {
 		return nil, err
 	}
 	var sl SessionList
-	_, err = sl.UnmarshalMsg(stored)
+	err = msgpack.Unmarshal(stored, &sl)
 	return sl, err
 }
 
@@ -81,7 +83,7 @@ func (j *Jeff) store(ctx context.Context, s Session) error {
 		sl = append(sl, s)
 	}
 	sl = prune(sl)
-	bts, err := sl.MarshalMsg(nil)
+	bts, err := msgpack.Marshal(sl)
 	if err != nil {
 		return err
 	}
@@ -112,7 +114,7 @@ func (j *Jeff) clear(ctx context.Context, key []byte, tokens ...[]byte) error {
 
 	// prune expired sessions
 	sl = prune(sl)
-	bts, err := sl.MarshalMsg(nil)
+	bts, err := msgpack.Marshal(sl)
 	if err != nil {
 		return err
 	}

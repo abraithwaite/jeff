@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abraithwaite/jeff"
-	memcache_store "github.com/abraithwaite/jeff/memcache"
-	"github.com/abraithwaite/jeff/memory"
-	redis_store "github.com/abraithwaite/jeff/redis"
+	"github.com/abraithwaite/jeff/v2"
+	memcache_store "github.com/abraithwaite/jeff/v2/memcache"
+	"github.com/abraithwaite/jeff/v2/memory"
+	redis_store "github.com/abraithwaite/jeff/v2/redis"
 	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/gomodule/redigo/redis"
 	"github.com/stretchr/testify/assert"
@@ -28,8 +28,14 @@ type server struct {
 // email is intentionally invalid
 var email = []byte("super@exa::mple.com")
 
+const testUserAgent = "gopherz-rule"
+
+type testMeta struct {
+	UserAgent string
+}
+
 func (s *server) login(w http.ResponseWriter, r *http.Request) {
-	err := s.j.Set(r.Context(), w, email, []byte(r.UserAgent()))
+	err := s.j.Set(r.Context(), w, email, testMeta{UserAgent: r.UserAgent()})
 	assert.NoError(s.t, err)
 }
 
@@ -43,12 +49,18 @@ var redir = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 })
 
 func (s *server) authed(w http.ResponseWriter, r *http.Request) {
-	v := jeff.ActiveSession(r.Context())
+	v, ok := jeff.ActiveSession(r.Context())
 	assert.Equal(s.t, email, v.Key, "authed session should set the user on context")
+	if ok {
+		var value testMeta
+		err := v.Value(&value)
+		assert.NoError(s.t, err, "loading session value should not error")
+		assert.Equal(s.t, testMeta{UserAgent: testUserAgent}, value, "session should have the meta set correctly")
+	}
 }
 
 func (s *server) public(w http.ResponseWriter, r *http.Request) {
-	v := jeff.ActiveSession(r.Context())
+	v, _ := jeff.SessionFromRequest(r)
 	if string(v.Key) != "" {
 		s.authedPub = true
 		assert.Equal(s.t, email, v.Key, "authed session should set the user on context")
@@ -139,7 +151,7 @@ func Suite(t *testing.T, store jeff.Storage) {
 
 	t.Run("login", func(t *testing.T) {
 		req = httptest.NewRequest("GET", "http://example.com/login", nil)
-		req.Header.Set("User-Agent", "golang-user-agent")
+		req.Header.Set("User-Agent", testUserAgent)
 		w = httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 		resp := w.Result()
@@ -165,6 +177,7 @@ func Suite(t *testing.T, store jeff.Storage) {
 
 	t.Run("new login", func(t *testing.T) {
 		req = httptest.NewRequest("GET", "http://example.com/login", nil)
+		req.Header.Set("User-Agent", testUserAgent)
 		w = httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 		resp := w.Result()
@@ -256,7 +269,7 @@ func Suite(t *testing.T, store jeff.Storage) {
 
 	t.Run("login", func(t *testing.T) {
 		req = httptest.NewRequest("GET", "http://example.com/login", nil)
-		req.Header.Set("User-Agent", "golang-user-agent")
+		req.Header.Set("User-Agent", testUserAgent)
 		w = httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 		resp := w.Result()
@@ -278,7 +291,7 @@ func Suite(t *testing.T, store jeff.Storage) {
 
 	t.Run("logout", func(t *testing.T) {
 		req = httptest.NewRequest("GET", "http://example.com/logout", nil)
-		req.Header.Set("User-Agent", "golang-user-agent")
+		req.Header.Set("User-Agent", testUserAgent)
 		req.AddCookie(cookie)
 		w = httptest.NewRecorder()
 		r.ServeHTTP(w, req)

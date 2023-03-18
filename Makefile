@@ -7,6 +7,10 @@ ifndef Q
 GOTESTFLAGS += -v
 endif
 
+export CGO_ENABLED=0
+
+export GOEXPERIMENT=nocoverageredesign
+
 .PHONY: deps
 deps:
 	$Qgo mod download
