@@ -414,3 +414,19 @@ func TestSessCookie(t *testing.T) {
 	cookie := cookies[0]
 	assert.True(t, cookie.Expires.IsZero(), "cookie expiration not set (session cookie)")
 }
+
+func TestMaxAge(t *testing.T) {
+	j := jeff.New(memory.New(), jeff.MaxAge(30))
+	s := &server{j: j, t: t}
+	r := http.NewServeMux()
+	r.HandleFunc("/login", s.login)
+	req := httptest.NewRequest("GET", "http://example.com/login", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	resp := w.Result()
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "login should succeed")
+	cookies := resp.Cookies()
+	require.Equal(t, 1, len(cookies), "login should set cookie")
+	cookie := cookies[0]
+	assert.Equal(t, 30, cookie.MaxAge, "cookie max age set to 30")
+}

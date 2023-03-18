@@ -38,6 +38,7 @@ type Jeff struct {
 	domain     string
 	path       string
 	expires    time.Duration
+	maxage     int
 	insecure   bool
 	samesite   http.SameSite
 }
@@ -95,6 +96,16 @@ func Path(p string) func(*Jeff) {
 func Expires(dur time.Duration) func(*Jeff) {
 	return func(j *Jeff) {
 		j.expires = dur
+	}
+}
+
+// MaxAge alternately sets the cookie lifetime.  After logging in, the session
+// will last for duration seconds after now.  If set to 0, then
+// Expiration is not set and the cookie will expire when the client closes
+// their user agent. Unset by default. Takes precedence over Expires.
+func MaxAge(duration int) func(*Jeff) {
+	return func(j *Jeff) {
+		j.maxage = duration
 	}
 }
 
@@ -200,7 +211,10 @@ func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte, meta 
 		SameSite: j.samesite,
 	}
 	var exp time.Time
-	if j.expires != 0 {
+	if j.maxage != 0 {
+		exp = now().Add(j.expires * time.Second)
+		c.MaxAge = j.maxage
+	} else if j.expires != 0 {
 		exp = now().Add(j.expires)
 		c.Expires = exp
 	} else {
@@ -233,7 +247,7 @@ func (j *Jeff) Clear(ctx context.Context, w http.ResponseWriter) error {
 		Value:    "deleted",
 		Path:     j.path,
 		Domain:   j.domain,
-		Expires:  time.Time{},
+		MaxAge:   -1,
 	}
 	http.SetCookie(w, c)
 	if len(s.Key) > 0 {
