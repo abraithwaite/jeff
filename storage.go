@@ -5,8 +5,6 @@ import (
 	"crypto/subtle"
 	"errors"
 	"time"
-
-	"github.com/vmihailenco/msgpack/v5"
 )
 
 // Storage provides the base level abstraction for implementing session
@@ -15,12 +13,12 @@ type Storage interface {
 	// Store persists the session in the backend with the given expiration
 	// Implementation must return value exactly as it is received.
 	// Value will be given as...
-	Store(ctx context.Context, key, value []byte, exp time.Time) error
+	Store(ctx context.Context, key []byte, sessions []Session, exp time.Time) error
 	// Fetch retrieves the session from the backend.  If err != nil or
 	// value == nil, then it's assumed that the session is invalid and Jeff
 	// will redirect.  Expired sessions must return nil error and nil value.
 	// Unknown (not found) sessions must return nil error and nil value.
-	Fetch(ctx context.Context, key []byte) (value []byte, err error)
+	Fetch(ctx context.Context, key []byte) (sessions []Session, err error)
 	// Delete removes the session given by key from the store. Errors are
 	// bubbled up to the caller.  Delete should not return an error on expired
 	// or missing keys.
@@ -39,17 +37,15 @@ func (j *Jeff) loadOne(ctx context.Context, key, tok []byte) (Session, error) {
 	return s, nil
 }
 
-func (j *Jeff) load(ctx context.Context, key []byte) (SessionList, error) {
+func (j *Jeff) load(ctx context.Context, key []byte) ([]Session, error) {
 	stored, err := j.s.Fetch(ctx, key)
 	if err != nil || stored == nil {
 		return nil, err
 	}
-	var sl SessionList
-	err = msgpack.Unmarshal(stored, &sl)
-	return sl, err
+	return stored, err
 }
 
-func find(l SessionList, k []byte) (Session, int) {
+func find(l []Session, k []byte) (Session, int) {
 	for i, s := range l {
 		if subtle.ConstantTimeCompare(s.Token, k) == 1 {
 			if s.Exp.Before(now()) {
@@ -61,8 +57,8 @@ func find(l SessionList, k []byte) (Session, int) {
 	return Session{}, -1
 }
 
-func prune(l SessionList) SessionList {
-	ret := make(SessionList, 0, len(l))
+func prune(l []Session) []Session {
+	ret := make([]Session, 0, len(l))
 	for _, s := range l {
 		if s.Exp.Before(now()) {
 			continue
@@ -83,12 +79,7 @@ func (j *Jeff) store(ctx context.Context, s Session) error {
 		sl = append(sl, s)
 	}
 	sl = prune(sl)
-	bts, err := msgpack.Marshal(sl)
-	if err != nil {
-		return err
-	}
-	// Global Expiration 30d, TODO: make configurable
-	return j.s.Store(ctx, s.Key, bts, now().Add(24*30*time.Hour))
+	return j.s.Store(ctx, s.Key, sl, now().Add(24*30*time.Hour))
 }
 
 // Clear deletes all sessions for a given key, or it deletes the selected
@@ -114,10 +105,5 @@ func (j *Jeff) clear(ctx context.Context, key []byte, tokens ...[]byte) error {
 
 	// prune expired sessions
 	sl = prune(sl)
-	bts, err := msgpack.Marshal(sl)
-	if err != nil {
-		return err
-	}
-	// Global Expiration 30d, TODO: make configurable
-	return j.s.Store(ctx, key, bts, now().Add(24*30*time.Hour))
+	return j.s.Store(ctx, key, sl, now().Add(24*30*time.Hour))
 }
