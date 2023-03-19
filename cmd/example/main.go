@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/abraithwaite/jeff"
-	redis_store "github.com/abraithwaite/jeff/redis"
+	"github.com/abraithwaite/jeff/v2"
+	redis_store "github.com/abraithwaite/jeff/v2/redis"
 	"github.com/gomodule/redigo/redis"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -58,13 +58,17 @@ func (s *server) registerFormHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) internalPageHandler(w http.ResponseWriter, r *http.Request) {
-	sess := jeff.ActiveSession(r.Context())
+	sess, _ := jeff.ActiveSession(r.Context())
 	fmt.Fprintf(w, internalPage, sess.Key)
 }
 
 func (s *server) publicPageHandler(w http.ResponseWriter, r *http.Request) {
-	sess := jeff.ActiveSession(r.Context())
-	fmt.Fprintf(w, publicPage, sess.Key)
+	sess, ok := jeff.ActiveSession(r.Context())
+	if ok {
+		fmt.Fprintf(w, publicPage, sess.Key)
+	} else {
+		fmt.Fprintf(w, publicPage, "anonymous")
+	}
 }
 
 func (s *server) loginHandler(w http.ResponseWriter, r *http.Request) {

@@ -4,10 +4,12 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/abraithwaite/jeff/v2"
 )
 
 type item struct {
-	value []byte
+	value []jeff.Session
 	exp   time.Time
 }
 
@@ -29,7 +31,7 @@ func New() *Memory {
 }
 
 // Store satisfies the jeff.Store.Store method
-func (m *Memory) Store(_ context.Context, key, value []byte, exp time.Time) error {
+func (m *Memory) Store(_ context.Context, key []byte, value []jeff.Session, exp time.Time) error {
 	m.rw.Lock()
 	m.sessions[string(key)] = item{
 		value: value,
@@ -40,7 +42,7 @@ func (m *Memory) Store(_ context.Context, key, value []byte, exp time.Time) erro
 }
 
 // Fetch satisfies the jeff.Store.Fetch method
-func (m *Memory) Fetch(_ context.Context, key []byte) ([]byte, error) {
+func (m *Memory) Fetch(_ context.Context, key []byte) ([]jeff.Session, error) {
 	m.rw.RLock()
 	v, ok := m.sessions[string(key)]
 	m.rw.RUnlock()

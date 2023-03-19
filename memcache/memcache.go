@@ -4,7 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/abraithwaite/jeff/v2"
 	"github.com/bradfitz/gomemcache/memcache"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // Store satisfies the jeff.Storage interface
@@ -18,15 +20,19 @@ func New(mc *memcache.Client) *Store {
 }
 
 // Store satisfies the jeff.Store.Store method
-func (s *Store) Store(ctx context.Context, key, value []byte, exp time.Time) error {
+func (s *Store) Store(ctx context.Context, key []byte, value []jeff.Session, exp time.Time) error {
 	e := int32(exp.UTC().Unix())
 
-	var err error
+	bts, err := msgpack.Marshal(value)
+	if err != nil {
+		return err
+	}
+
 	done := make(chan struct{})
 	go func() {
 		err = s.mc.Set(&memcache.Item{
 			Key:   string(key),
-			Value: value,
+			Value: bts,
 			// 2038...
 			Expiration: e,
 		})
@@ -41,7 +47,7 @@ func (s *Store) Store(ctx context.Context, key, value []byte, exp time.Time) err
 }
 
 // Fetch satisfies the jeff.Store.Fetch method
-func (s *Store) Fetch(ctx context.Context, key []byte) ([]byte, error) {
+func (s *Store) Fetch(ctx context.Context, key []byte) ([]jeff.Session, error) {
 	var i *memcache.Item
 	var err error
 
@@ -62,7 +68,13 @@ func (s *Store) Fetch(ctx context.Context, key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return i.Value, nil
+
+	var sl []jeff.Session
+	err = msgpack.Unmarshal(i.Value, &sl)
+	if err != nil {
+		return nil, err
+	}
+	return sl, nil
 }
 
 // Delete satisfies the jeff.Store.Delete method
