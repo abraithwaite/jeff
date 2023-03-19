@@ -9,6 +9,7 @@ require (
 	github.com/gorilla/mux v1.7.0
 	github.com/stretchr/testify v1.6.1
 	github.com/vmihailenco/msgpack/v5 v5.3.6-0.20220405065333-233c977ae92b
+	golang.org/x/exp v0.0.0-20230315142452-642cacee5cc0
 )
 
 require (

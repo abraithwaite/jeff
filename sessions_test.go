@@ -30,12 +30,8 @@ var email = []byte("super@exa::mple.com")
 
 const testUserAgent = "gopherz-rule"
 
-type testMeta struct {
-	UserAgent string
-}
-
 func (s *server) login(w http.ResponseWriter, r *http.Request) {
-	err := s.j.Set(r.Context(), w, email, testMeta{UserAgent: r.UserAgent()})
+	err := s.j.Set(r.Context(), w, email, jeff.KeyValue{"user-agent", r.UserAgent()})
 	assert.NoError(s.t, err)
 }
 
@@ -49,13 +45,12 @@ var redir = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 })
 
 func (s *server) authed(w http.ResponseWriter, r *http.Request) {
-	v, ok := jeff.ActiveSession(r.Context())
-	assert.Equal(s.t, email, v.Key, "authed session should set the user on context")
+	session, ok := jeff.ActiveSession(r.Context())
+	assert.Equal(s.t, email, session.Key, "authed session should set the user on context")
 	if ok {
-		var value testMeta
-		err := v.Value(&value)
-		assert.NoError(s.t, err, "loading session value should not error")
-		assert.Equal(s.t, testMeta{UserAgent: testUserAgent}, value, "session should have the meta set correctly")
+		v, ok := session.Get("user-agent")
+		assert.True(s.t, ok, "session value should be present")
+		assert.Equal(s.t, testUserAgent, v, "session should have the meta set correctly")
 	}
 }
 

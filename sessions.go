@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/vmihailenco/msgpack/v5"
 )
 
 // Cookie Format
@@ -196,7 +194,7 @@ func (j *Jeff) wrap(redir, wrap http.Handler) http.Handler {
 // Set the session cookie on the response.  Call after successful
 // authentication / login.  meta optional parameter sets metadata in the
 // session storage.
-func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte, meta ...any) error {
+func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte, meta ...KeyValue) error {
 	if len(meta) > 1 {
 		panic("meta must not be longer than 1")
 	}
@@ -222,15 +220,11 @@ func (j *Jeff) Set(ctx context.Context, w http.ResponseWriter, key []byte, meta 
 		exp = now().Add(30 * 24 * time.Hour)
 	}
 	http.SetCookie(w, c)
-	metSer, err := msgpack.Marshal(meta[0])
-	if err != nil {
-		return err
-	}
 	return j.store(ctx, Session{
 		Key:   key,
 		Token: []byte(secure),
 		Exp:   exp,
-		Meta:  metSer,
+		Meta:  meta,
 	})
 }
 
