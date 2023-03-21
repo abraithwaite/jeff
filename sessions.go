@@ -227,7 +227,9 @@ func (j *Jeff) Clear(ctx context.Context, w http.ResponseWriter) error {
 		Value:    "deleted",
 		Path:     j.path,
 		Domain:   j.domain,
-		Expires:  time.Unix(0, 0),
+		// Negative MaxAge actually sets 'Max-Age: 0'
+		// https://pkg.go.dev/net/http#Cookie
+		MaxAge: -1,
 	})
 	if len(s.Key) > 0 {
 		// TODO: a bit worried about corrupt (empty) tokens.
